@@ -1,0 +1,333 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>CBVoting</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" type="text/css" href="./lib/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" type="text/css" href="./stylesheets/basic.css">
+<script src="./scripts/jquery-3.2.1.min.js"></script>
+<script src="./lib/bootstrap/js/bootstrap.min.js"></script>
+<script src="./scripts/vsauth.js"></script>
+<script>
+
+	'use strict';
+
+	function onUserGet(vsUser) {
+		console.log(vsUser);
+		if(vsUser == null) window.location.replace('/auth.html');
+	};
+
+	function onUserLogout() {
+		window.location.replace('/auth.html');
+	};
+
+	function onQuestionsGet(res) {
+		console.log(res);
+	};
+
+	function onQuestionCreate(res) {
+
+	};
+
+	function showDialog(msg, type) {
+		const db = $('.dialog-box');
+		switch(type) {
+			case 's' : db.addClass('bg-success'); break;
+			case 'd' : db.addClass('bg-danger'); break;
+			default : db.addClass('bg-warning');
+		}
+		db.text(msg);
+		db.slideDown();
+		var i = setInterval(() => {
+			db.slideUp();
+			clearInterval(i);
+		}, 3000);
+	};
+
+	function DomHandler(auth) {
+		const inst = this;
+		this.auth = auth;
+		this.nextQuesId = 1;
+
+		//dom shortcuts
+		this.wrapper = $('.outer-wrapper');
+		//ques
+		this.quesCardContainer = $('.question-card-container');
+		this.quesContainer = $('.question-container-post');
+		this.addQuestionBtn = $('.add-ques-dialog-btn');
+		this.closeQuestionBtn = $('.close-ques-dialog-btn');
+		this.addQuestionDialog = $('.add-ques-dialog-container');
+		this.quesField = $('.ques');
+		//option
+		this.optionContainerPost = $('.option-container-post');
+		this.addOptionFieldBtn = $('.add-option-field-btn');
+		this.discardOptionFieldBtn = $('.discard-option-field-btn');
+		this.optionContainer = $('.option-container');
+		this.optionField = $('.option');
+		this.optionPostBtn = $('.option-post-btn');
+
+		this.postQuestionBtn = $('.post-ques-btn');
+
+		this.logoutBtn = $('.logout-btn');
+
+		//event listeners
+		this.addQuestionBtn.click(() => {
+			this.setAddQuestionDialogVisible(true);
+			this.curtains(true);
+		});
+
+		this.closeQuestionBtn.click(() => {
+			this.setAddQuestionDialogVisible(false);
+			this.curtains(false);
+		});
+
+		this.addOptionFieldBtn.click(() => {
+			this.addOptionField();
+		});
+
+		this.postQuestionBtn.click(() => {
+			const ques = this.quesField.val().trim();
+			var optArr = [];
+			if(!ques) {
+				return;
+			}
+			this.optionField = $('.option');
+			if(this.optionField.length < 2) {
+				showDialog('Please add at least 2 options');
+				return;
+			}
+			$.each(this.optionField, (i,e) => {
+				optArr.push($(e).val());
+			});
+			const params = {
+				question : ques,
+				options : optArr
+			};
+			console.log('sending...');
+			console.log(params);
+			$.post('CreateQuestion', $.param(params), function(res) {
+				console.log(res);
+				if(res.result_code) {
+					inst.setAddQuestionDialogVisible(false);
+					inst.curtains(false);
+					inst.createQuestionCard(res.question);
+					showDialog('Question Added Successfully!','s');
+				}
+				else {
+					showDialog(res.error,'d');
+				}
+			});
+		});
+
+		this.logoutBtn.click(() => {
+			this.auth.logout(onUserLogout);
+		});
+
+		//dynamically added click events
+		$(document).on('click', '.discard-option-field-btn', function() {
+			inst.discardOptionField($(this).parent());
+		});
+
+		$(document).on('click', '.option-post-btn', function() {
+			const i = $(this);
+			const optId = $(this).attr('data-option');
+			const params = {
+				option : optId
+			};
+			var totalVoteCount, percentVoteCount;
+			$.post('Vote', $.param(params), function(res) {
+				if(res.result_code && res.question != null) {
+					i.parent().parent().find('.option-post-btn').prop('disabled',true);
+					totalVoteCount = 0;
+					$.each(res.question.optionList, (i, e) => {
+						totalVoteCount += e.voteCount;
+					});
+					for(var j = 0; j < res.question.optionList.length; j++) {
+						console.log(i.parent().parent().find('.option-post-btn')[j]);
+						console.log(res.question.optionList[j]);
+						percentVoteCount = res.question.optionList[j].voteCount / totalVoteCount * 100;
+						$('<div class="d-inline-block ml-2 text-muted" style="font-style: italic; font-size:12px">' + percentVoteCount.toFixed(1) + '%</div>').insertAfter(i.parent().parent().find('.option-post-btn')[j]);
+					}
+					showDialog('Voted!','s');
+				}
+				else {
+					showDialog('Sorry! An error occurred','d');
+				}
+			});
+		});
+	};
+
+	DomHandler.prototype.curtains = function(bool) {
+		if(bool)
+			this.wrapper.show();
+		else
+			this.wrapper.hide();
+	};
+
+	DomHandler.prototype.getAllQuestions = function(callback) {
+		const inst = this;
+		var quesArr = [];
+		$.post('GetAllQuestions', $.param({}), function(res) {
+			if(res.result_code) {
+				quesArr = res.question;
+				$.each(quesArr, (i,e) => {
+					inst.createQuestionCard(e);
+				});
+			}
+		}).done(function() {
+			callback(quesArr);
+		});
+	};
+
+	DomHandler.prototype.createQuestionCard = function(ques) {
+		this.quesCardContainer.prepend('<div class="card shadow grad-light-2 my-5"><div class="card-body text-center" data-ques="' + this.nextQuesId + '"><div class="text-right text-muted" style="font-style: italic;">' + ques.setter.displayName + '</div><div class="question-container-post position-relative my-2"><div class="ques-post h3">' + ques.body + '</div></div><div class="option-container-post my-4" data-parent-ques="' + this.nextQuesId + '"></div></div></div>');
+		const currentOptContainer = this.quesCardContainer.find("[data-ques='" + this.nextQuesId + "']").find('.option-container-post');
+		if(ques.voted) {
+			var totalVoteCount = 0, percentVoteCount = 0;
+			$.each(ques.optionList, (i, e) => {
+				totalVoteCount += e.voteCount;
+			});
+			$.each(ques.optionList, (i, e) => {
+				percentVoteCount = e.voteCount / totalVoteCount * 100;
+				currentOptContainer.append('<div class="option-post my-2"><button type="button" class="btn btn-outline-secondary w-50 option-post-btn" data-option="' + e.id + '" disabled>' + e.body + '</button><div class="d-inline-block ml-2 text-muted" style="font-style: italic; font-size:12px">' + percentVoteCount.toFixed(1) + '%</div></div>');
+			});
+		}
+		else {
+			$.each(ques.optionList, (i, e) => {
+				currentOptContainer.append('<div class="option-post my-2"><button type="button" class="btn btn-outline-secondary w-50 option-post-btn" data-option="' + e.id + '">' + e.body + '</button></div>');
+			});
+		}
+		this.nextQuesId++;
+	};
+
+	DomHandler.prototype.setAddQuestionDialogVisible = function(bool) {
+		if(bool)
+			this.addQuestionDialog.show();
+		else
+			this.addQuestionDialog.hide();
+	};
+
+	DomHandler.prototype.addOptionField = function() {
+		this.optionContainer.append('<div class="w-75 position-relative mx-auto my-2 cursor-pointer"><i class="fa fa fa-close text-muted position-absolute discard-option-field-btn" style="left: -25px; top: 8px; font-size: 155%;"></i><input type="text" class="form-control font-weight-light option" placeholder="Write Option"></div>');
+	};
+
+	DomHandler.prototype.discardOptionField = function(field) {
+		field.remove();
+	};
+
+	$(document).ready(() => {
+		const vsAuth = new VSAuth();
+		//check if user logged in
+		vsAuth.getUser(onUserGet);
+		const domHandler = new DomHandler(vsAuth);
+		//fetch questions
+		domHandler.getAllQuestions(onQuestionsGet);
+	});
+
+</script>
+</head><body>
+	<div class="outer-wrapper position-fixed curtain" style="width: 100%; height: 100%; z-index: 999; display: none;">
+		<div class="add-ques-dialog-container position-fixed vertical-center w-r" style="left: 50%; transform: translateX(-50%); display: none;">
+			<div class="card shadow w-100">
+				<div class="card-header">
+					<div class="text-dark d-inline-block">CREATE A POST</div>
+					<div class="float-right d-inline-block">
+						<button class="btn btn-outline-secondary close-ques-dialog-btn" style="padding-top: 0px; padding-bottom: 0px;">
+							<i class="fa fa-close text-dark" style="font-size: 120%;"></i>
+						</button>
+					</div>
+				</div>
+				<div class="card-body">
+					<div class="question-container my-3">
+						<div class="w-75 mx-auto position-relative">
+							<i class="fa fa-question-circle text-dark position-absolute" style="left: -25px; font-size: 155%;"></i>
+							<textarea class="ques w-100 mx-auto form-control font-weight-light" wrap="hard" rows="5" placeholder="What's on your mind?" contenteditable="true" style="resize: none;"></textarea>
+						</div>
+					</div>
+					<div class="option-container mt-4 mb-2"></div>
+					<div class="option-dummy w-75 position-relative mx-auto">
+						<i class="fa fa-plus-circle text-dark position-absolute add-option-field-btn" style="left: -25px; top: 8px; font-size: 155%;"></i>
+						<input type="text" class="form-control font-weight-light" placeholder="Option..." disabled>
+					</div>
+				</div>
+				<div class="card-footer">
+					<div>
+						<button class="btn btn-dark post-ques-btn font-1 float-right">POST</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="outer-container">
+		<div class="dialog-box position-fixed w-100 p-3 text-center text-light font-1" style="z-index:999; display: none;"></div>
+		<div class="position-fixed" style="bottom: -20px; right: 1%; width: 100px; height: 100px; z-index: 999;">
+			<button class="btn btn-danger rounded-circle add-ques-dialog-btn" style="width: 55px; height: 55px;">
+				<i class="fa fa-plus text-white" style="font-size: 190%;"></i>
+			</button>
+		</div>
+		<div class="header-container">
+			<header class="py-2 border-bottom shadow">
+				<div class="container">
+					<div class="row">
+						<div class="favicon-container col-4">
+							<div style="width: 50px; height: 50px;">
+								<img src="./resources/favicon-i.png" alt="Voting System Logo" class="favicon w-100 h-100">
+							</div>
+						</div>
+						<div class="col-4 text-center mt-3 h5 font-1">
+							Rise Up And Vote
+						</div>
+						<div class="col-4 text-right">
+							<button type="button" class="btn btn-outline-secondary logout-btn mt-2" style="font-size: 75%;">Log Out</button>
+						</div>
+					</div>
+				</div>
+			</header>
+		</div>
+		<div class="main-container">
+			<main class="bg-transparent" style="margin-bottom: 0px;">
+				<div class="container question-card-container">
+					<!--
+					<div class="card shadow grad-light-2 my-5">
+						<div class="card-body text-center">
+							<div class="question-container-post position-relative my-3">
+								<div class="ques-post h1">How do you pronounce CAT?</div>
+							</div>
+							<div class="option-container-post my-4">
+								<div class="option-post my-2">
+									<button type="button" class="btn btn-outline-secondary w-50 save-b">Save</button>
+								</div>
+								<div class="option-post my-2">
+									<button type="button" class="btn btn-outline-secondary w-50 discard-b">Discard</button>
+								</div>
+								<div class="option-post my-2">
+									<button type="button" class="btn btn-outline-secondary w-50 show-b">Show</button>
+								</div>
+								<div class="option-post my-2">
+									<button type="button" class="btn btn-outline-secondary w-50">Wuff!</button>
+								</div>
+							</div>
+						</div>
+					</div>
+					-->
+				</div>
+			</main>
+		</div>
+	</div>
+</body></html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

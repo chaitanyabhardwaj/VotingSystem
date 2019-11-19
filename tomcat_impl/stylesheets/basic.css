@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css?family=Big+Shoulders+Text&display=swap');
+* { box-sizing: border-box; padding: 0px; margin: 0px; }
+.vertical-center { min-height: 100%; min-height: 100vh; display: flex; align-items: center; }
+.cursor-pointer { cursor: pointer !important; }
+.bg-primary-light { background-color: #99caff !important; }
+.bg-auth { background: linear-gradient(to bottom right, rgba(0,0,0,1) 5%, rgba(7,7,7,0.9) 30%, rgba(255,255,255,.1)), url('/resources/bg_auth.jpg'); background-repeat: no-repeat; background-size: cover; }
+.user-type, .switch-form { -webkit-transition: all 0.5s; -ms-transition: all 0.5s; -o-transition: all 0.5s; -moz-transition: all 0.5s; transition: all 0.5s; }
+.grad-bw { background-image: linear-gradient(to top left, #fff 70%, #6c757d) !important; }
+.grad-light-1 { background-image: linear-gradient(to top, #fff 80%, #ddd) !important; }
+.grad-light-2 { background-image: linear-gradient(to bottom, #fff 80%, #ddd) !important; }
+.font-1 { font-family: 'Big Shoulders Text', cursive !important; }
+.text-l { font-size: 200%; }
+.text-m { font-size: 150%; }
+.text-s { font-size: 80%; }
+.curtain { background-color: rgba(0,0,0,0.6) !important; }
+
+@media screen and (max-width: 600px) {
+	.w-r { width: 95% !important; }
+}
+
+@media screen and (min-width: 601px) and (max-width: 1200px) {
+	.w-r { width: 75% !important; }
+}
+
+@media screen and (min-width: 1201px) {
+	.w-r { width: 45% !important; }
+}

@@ -1,0 +1,271 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>CBVoting</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" type="text/css" href="./lib/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" type="text/css" href="./stylesheets/basic.css">
+<script src="./scripts/jquery-3.2.1.min.js"></script>
+<script src="./lib/bootstrap/js/bootstrap.min.js"></script>
+<script src="./scripts/vsauth.js"></script>
+<script>
+	'use strict';
+
+	function onUserGet(vsUser) {
+		console.log('onUserGet');
+		console.log(vsUser);
+		if(vsUser != null) window.location.replace('/');
+	};
+
+	function onUserAuthGet(vsUser) {
+		console.log('onUserAuthGet');
+		console.log(vsUser);
+		if(vsUser != null) window.location.replace('/');
+	};
+
+	function onUserCreate(res) {
+		if(res != null && res.result_code && res.user != null) window.location.replace('/');
+		else if(res != null) showDialog(res.error,'d');
+		else showDialog('An error occurred','d');
+	};
+
+	function showDialog(msg, type) {
+		const db = $('.dialog-box');
+		switch(type) {
+			case 's' : db.addClass('bg-success'); break;
+			case 'd' : db.addClass('bg-danger'); break;
+			default : db.addClass('bg-warning');
+		}
+		db.text(msg);
+		db.slideDown();
+		var i = setInterval(() => {
+			db.slideUp();
+			clearInterval(i);
+		}, 3000);
+	};
+
+	function FormManager(authManager) {
+		const inst = this;
+
+		this.authManager = authManager;
+		this.userType = $('.user-type');
+		this.typeAdmin = $('#type-admin');
+		this.typeUser = $('#type-user');
+		this.userTypeValue = 'type-user';
+		this.userTypeContainer = $('.user-type-container');
+
+		this.formSwitch = $('.switch-form');
+		this.formSignup = $('#switch-signup');
+		this.formLogin = $('#switch-login');
+		this.formSwitchValue = 'switch-signup';
+
+		//form feilds
+		this.displayNameField = $('#display-name');
+		this.usernameField = $('#user-name');
+		this.passwdField = $('#passwd');
+		this.authButton = $('#auth-btn');
+
+		this.userType.click(function() {
+			inst.userTypeValue = this.id;
+			switch(this.id) {
+				case 'type-admin' :
+					inst.typeAdmin.removeClass('bg-light');
+					inst.typeAdmin.addClass('bg-dark');
+					inst.typeAdmin.removeClass('text-dark');
+					inst.typeAdmin.addClass('text-white');
+					inst.typeUser.removeClass('bg-dark');
+					inst.typeUser.addClass('bg-light');
+					inst.typeUser.removeClass('text-white');
+					inst.typeUser.addClass('text-dark');
+					break;
+				case 'type-user' :
+					inst.typeUser.removeClass('bg-light');
+					inst.typeUser.addClass('bg-dark');
+					inst.typeUser.removeClass('text-dark');
+					inst.typeUser.addClass('text-white');
+					inst.typeAdmin.removeClass('bg-dark');
+					inst.typeAdmin.addClass('bg-light');
+					inst.typeAdmin.removeClass('text-white');
+					inst.typeAdmin.addClass('text-dark');
+					break;
+				default : 
+					console.log(this);
+			}
+		});
+
+		this.formSwitch.click(function() {
+			inst.formSwitchValue = this.id;
+			switch(this.id) {
+				case 'switch-signup' :
+					inst.formSignup.removeClass('bg-light');
+					inst.formSignup.addClass('bg-dark');
+					inst.formSignup.removeClass('text-dark');
+					inst.formSignup.addClass('text-white');
+					inst.formLogin.removeClass('bg-dark');
+					inst.formLogin.addClass('bg-light');
+					inst.formLogin.removeClass('text-white');
+					inst.formLogin.addClass('text-dark');
+					inst.displayNameField.slideDown();
+					inst.authButton.text("SIGN UP");
+					inst.userTypeContainer.slideDown();
+					break;
+				case 'switch-login' :
+					inst.formLogin.removeClass('bg-light');
+					inst.formLogin.addClass('bg-dark');
+					inst.formLogin.removeClass('text-dark');
+					inst.formLogin.addClass('text-white');
+					inst.formSignup.removeClass('bg-dark');
+					inst.formSignup.addClass('bg-light');
+					inst.formSignup.removeClass('text-white');
+					inst.formSignup.addClass('text-dark');
+					inst.displayNameField.slideUp();
+					inst.authButton.text("LOG IN");
+					inst.userTypeContainer.slideUp();
+					break;
+				default : 
+					console.log(this);
+			}
+		});
+
+		this.authButton.click(() => {
+			var params, vsUser;
+			if(this.verifyUsername() && this.verifyPasswd()) {
+				switch(this.formSwitchValue) {
+					case 'switch-signup' :
+						const utv = (this.userTypeValue == 'type-admin') ? 0 : 1;
+						if(this.verifyName()) {
+							params = {
+								display_name : this.displayNameField.val(),
+								username : this.usernameField.val(),
+								passwd : this.passwdField.val(),
+								user_type : utv
+							}
+							this.authManager.createUser(params, onUserCreate);
+						}
+						else {
+							showDialog("Invalid name provided! Please enter a person's name.",'d');
+						}
+						break;
+					case 'switch-login' :
+						params = {
+							username : this.usernameField.val(),
+							passwd : this.passwdField.val()
+						}
+						this.authManager.getUserAuth(params, onUserAuthGet);
+						break;
+					default : ;
+				}
+			}
+			else {
+				showDialog('Invalid credential provided! Please check the credentials again.','d');
+			}
+		});
+	};
+
+	FormManager.prototype.verifyName = function() {
+		const n = this.displayNameField.val();
+		const illegalChars = ['.','/','\\','<','>','?','!','^','&','*','$'];
+		for(var i = 0; i < illegalChars.length; i++) {
+			if(n.indexOf(illegalChars[i]) != -1) return false;
+		}
+		return true;
+	};
+
+	FormManager.prototype.verifyUsername = function() {
+		const u = this.usernameField.val();
+		const illegalChars = ['.','/','\\','<','>','?','!','^','&','*','$'];
+		if(u.length < 4) return false;
+		for(var i = 0; i < illegalChars.length; i++) {
+			if(u.indexOf(illegalChars[i]) != -1) return false;
+		}
+		return true;
+	};
+
+	FormManager.prototype.verifyPasswd = function() {
+		const p = this.passwdField.val();
+		const illegalChars = ['.','/','\\','<','>','?','^','&','*'];
+		if(p.length < 4) return false;
+		for(var i = 0; i < illegalChars.length; i++) {
+			if(p.indexOf(illegalChars[i]) != -1) return false;
+		}
+		return true;
+	};
+
+	$(document).ready(() => {
+		const vsAuth = new VSAuth();
+		//check if user logged in
+		vsAuth.getUser(onUserGet);
+		const formManager = new FormManager(vsAuth);
+	});
+
+</script>
+</head><body>
+	<div class="outer-wrapper"></div>
+	<div class="outer-container">
+		<div class="dialog-box position-fixed w-100 p-3 text-center text-light font-1" style="z-index:999; display: none;"></div>
+		<div class="main-container bg-auth">
+			<main class="jumbotron vertical-center bg-transparent" style="margin-bottom: 0px;">
+				<div class="auth-form-container container">
+					<div class="row">
+						<div class="col-sm-1 col-md-2 col-lg-3"></div>
+						<div class="col-sm-10 col-md-8 col-lg-6">
+							<div class="card shadow">
+								<div class="card-body">
+									<div class="favicon-container mx-auto mt-4" style="width: 100px; height: 100px;">
+										<img src="./resources/favicon-i.png" alt="Voting System Logo" class="favicon w-100 h-100">
+									</div>
+									<div class="text-center mb-4 font-1">
+										Rise Up And Vote
+									</div>
+									<div id="signup-form">
+										<div class="position-relative">
+											<i class="fa fa-user position-absolute text-secondary" style="font-size: 125%; top: 20%; left: 14%;"></i>
+											<input type="text" class="form-control w-75 mx-auto my-3 pl-4 font-weight-light font-1" id="display-name" placeholder="Display Name">
+										</div>
+										<div class="position-relative">
+											<i class="fa fa-id-badge position-absolute text-secondary" style="font-size: 125%; top: 20%; left: 14%;"></i>
+											<input type="text" class="form-control w-75 mx-auto my-3 pl-4 font-weight-light font-1" id="user-name" placeholder="Username">
+										</div>
+										<div class="position-relative">
+											<i class="fa fa-unlock-alt position-absolute text-secondary" style="font-size: 125%; top: 20%; left: 14%;"></i>
+											<input type="password" class="form-control w-75 mx-auto my-3 pl-4 font-weight-light font-1" id="passwd" placeholder="Password">
+										</div>
+										<div class="text-center user-type-container">
+											<div class="d-inline-block bg-light px-3 py-1 text-dark user-type cursor-pointer font-1" id="type-admin" style="border-radius: 7px 0px 0px 7px; font-size: 110%;">Admin</div><!--
+											--><div class="d-inline-block bg-dark px-3 py-1 text-white user-type cursor-pointer font-1" id="type-user" style="border-radius: 0px 7px 7px 0px; font-size: 110%;">User</div>
+										</div>
+										<div class="text-center my-3">
+											<button class="btn btn-dark px-5 font-1 shadow" id="auth-btn" style="font-size: 110%;">SIGN UP</button>
+										</div>
+										<div class="text-center my-2">
+											<hr>
+											<div class="d-inline-block bg-dark px-3 py-1 text-white switch-form cursor-pointer font-1" id="switch-signup" style="border-radius: 7px 0px 0px 7px; font-size: 90%;">Sign Up</div><!--
+											--><div class="d-inline-block bg-light px-3 py-1 text-dark switch-form cursor-pointer font-1" id="switch-login" style="border-radius: 0px 7px 7px 0px; font-size: 90%;">Log In</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-sm-1 col-md-2 col-lg-3"></div>
+					</div>
+				</div>
+			</main>
+		</div>
+	</div>
+</body></html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
